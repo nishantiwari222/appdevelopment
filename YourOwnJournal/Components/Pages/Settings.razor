@@ -1,0 +1,84 @@
+@page "/settings"
+@inject SettingsService SettingsService
+@inject SecurityService SecurityService
+@inject AppState AppState
+
+<div class="card-soft">
+    <h3>Settings</h3>
+    <div class="text-muted">Customize the look and security of your journal.</div>
+</div>
+
+<div class="card-soft">
+    <h5>Theme</h5>
+    <div class="d-flex align-items-center gap-2">
+        <InputSelect class="form-select" @bind-Value="Theme">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+        </InputSelect>
+        <button class="btn btn-outline-primary" @onclick="SaveTheme">Save theme</button>
+    </div>
+</div>
+
+<div class="card-soft">
+    <h5>Pagination</h5>
+    <div class="d-flex align-items-center gap-2">
+        <InputNumber class="form-control" @bind-Value="PageSize" />
+        <button class="btn btn-outline-primary" @onclick="SavePageSize">Save page size</button>
+    </div>
+</div>
+
+<div class="card-soft">
+    <h5>Change PIN</h5>
+    <div class="row g-2">
+        <div class="col-md-4">
+            <InputText type="password" class="form-control" @bind-Value="CurrentPin" placeholder="Current PIN" />
+        </div>
+        <div class="col-md-4">
+            <InputText type="password" class="form-control" @bind-Value="NewPin" placeholder="New PIN" />
+        </div>
+        <div class="col-md-4">
+            <button class="btn btn-outline-primary" @onclick="ChangePin">Update PIN</button>
+        </div>
+    </div>
+    <div class="text-muted mt-2">@PinMessage</div>
+</div>
+
+@code {
+    private string Theme { get; set; } = "light";
+    private int PageSize { get; set; } = 10;
+    private string CurrentPin { get; set; } = string.Empty;
+    private string NewPin { get; set; } = string.Empty;
+    private string PinMessage { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Theme = await SettingsService.GetThemeAsync();
+        PageSize = await SettingsService.GetPageSizeAsync();
+    }
+
+    private async Task SaveTheme()
+    {
+        await SettingsService.SetThemeAsync(Theme);
+        AppState.SetTheme(Theme);
+        PinMessage = "Theme applied.";
+    }
+
+    private async Task SavePageSize()
+    {
+        if (PageSize < 1)
+        {
+            PageSize = 10;
+        }
+
+        await SettingsService.SetPageSizeAsync(PageSize);
+        PinMessage = "Page size updated.";
+    }
+
+    private async Task ChangePin()
+    {
+        var result = await SecurityService.ChangePinAsync(CurrentPin, NewPin);
+        PinMessage = result.Message;
+        CurrentPin = string.Empty;
+        NewPin = string.Empty;
+    }
+}

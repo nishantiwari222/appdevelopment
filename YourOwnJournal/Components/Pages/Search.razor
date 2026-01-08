@@ -1,0 +1,121 @@
+@page "/search"
+@inject JournalService JournalService
+@inject MoodService MoodService
+@inject TagService TagService
+
+<div class="card-soft">
+    <h3>Search & Filter</h3>
+    <div class="text-muted">Find entries by content, date, mood, or tags.</div>
+</div>
+
+<div class="card-soft">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <InputText class="form-control" @bind-Value="Query" placeholder="Title or content" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Start date</label>
+            <InputDate class="form-control" @bind-Value="StartDate" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">End date</label>
+            <InputDate class="form-control" @bind-Value="EndDate" />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Mood</label>
+            <InputSelect class="form-select" @bind-Value="SelectedMoodId">
+                <option value="">Any mood</option>
+                @foreach (var mood in Moods)
+                {
+                    <option value="@mood.MoodId">@mood.Name (@mood.Category)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Tags</label>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var tag in Tags)
+                {
+                    <label class="badge-soft">
+                        <input type="checkbox"
+                               checked="@SelectedTagIds.Contains(tag.TagId)"
+                               @onchange="(args) => ToggleTag(tag.TagId, args.Value)" />
+                        @tag.Name
+                    </label>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="mt-3">
+        <button class="btn btn-primary" @onclick="RunSearch">Search</button>
+    </div>
+</div>
+
+<div class="card-soft">
+    @if (Results.Count == 0)
+    {
+        <div class="text-muted">No results yet.</div>
+    }
+    else
+    {
+        <table class="table-lite">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Mood</th>
+                    <th>Tags</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Results)
+                {
+                    <tr>
+                        <td><a href="/entries/@entry.EntryDate.ToString("yyyy-MM-dd")">@entry.EntryDate.ToString("yyyy-MM-dd")</a></td>
+                        <td>@entry.Title</td>
+                        <td>@entry.PrimaryMood?.Name</td>
+                        <td>@string.Join(", ", entry.EntryTags.Select(et => et.Tag?.Name).Where(t => !string.IsNullOrWhiteSpace(t)))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private string? Query { get; set; }
+    private DateTime? StartDate { get; set; }
+    private DateTime? EndDate { get; set; }
+    private int? SelectedMoodId { get; set; }
+    private List<int> SelectedTagIds { get; set; } = new();
+    private IReadOnlyList<Mood> Moods { get; set; } = new List<Mood>();
+    private IReadOnlyList<Tag> Tags { get; set; } = new List<Tag>();
+    private IReadOnlyList<JournalEntry> Results { get; set; } = new List<JournalEntry>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Moods = await MoodService.GetAllAsync();
+        Tags = await TagService.GetAllAsync();
+    }
+
+    private void ToggleTag(int tagId, object? isChecked)
+    {
+        if (isChecked is bool selected && selected)
+        {
+            if (!SelectedTagIds.Contains(tagId))
+            {
+                SelectedTagIds.Add(tagId);
+            }
+        }
+        else
+        {
+            SelectedTagIds.Remove(tagId);
+        }
+    }
+
+    private async Task RunSearch()
+    {
+        Results = await JournalService.SearchAsync(Query, StartDate, EndDate, SelectedMoodId, SelectedTagIds);
+    }
+}

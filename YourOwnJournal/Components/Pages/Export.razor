@@ -1,0 +1,57 @@
+@page "/export"
+@inject JournalService JournalService
+@inject ExportService ExportService
+
+<div class="card-soft">
+    <h3>Export to PDF</h3>
+    <div class="text-muted">Export multiple entries by date range.</div>
+</div>
+
+<div class="card-soft">
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label">Start date</label>
+            <InputDate class="form-control" @bind-Value="StartDate" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">End date</label>
+            <InputDate class="form-control" @bind-Value="EndDate" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Output path</label>
+            <InputText class="form-control" @bind-Value="OutputPath" />
+        </div>
+    </div>
+    <div class="mt-3">
+        <button class="btn btn-primary" @onclick="RunExport">Export PDF</button>
+    </div>
+    <div class="text-muted mt-2">@Message</div>
+</div>
+
+@code {
+    private DateTime StartDate { get; set; } = DateTime.Today.AddDays(-30);
+    private DateTime EndDate { get; set; } = DateTime.Today;
+    private string OutputPath { get; set; } = Path.Combine(FileSystem.AppDataDirectory, "yourownjournal-export.pdf");
+    private string Message { get; set; } = string.Empty;
+
+    private async Task RunExport()
+    {
+        Message = string.Empty;
+        var entries = await JournalService.GetByDateRangeAsync(StartDate, EndDate);
+        if (entries.Count == 0)
+        {
+            Message = "No entries in selected range.";
+            return;
+        }
+
+        try
+        {
+            await ExportService.ExportToPdfAsync(OutputPath, entries);
+            Message = $"Exported {entries.Count} entries to {OutputPath}.";
+        }
+        catch (Exception ex)
+        {
+            Message = ex.Message;
+        }
+    }
+}

@@ -1,0 +1,113 @@
+@page "/"
+@inject JournalService JournalService
+@inject StreakService StreakService
+@inject AnalyticsService AnalyticsService
+
+<div class="card-soft">
+    <div class="d-flex justify-content-between flex-wrap gap-3">
+        <div>
+            <div class="badge-soft">Overview</div>
+            <h2 class="mt-2">Welcome back</h2>
+            <div class="text-muted">Your journal highlights for the selected range.</div>
+        </div>
+        <div class="d-flex gap-2">
+            <InputDate @bind-Value="StartDate" class="form-control" />
+            <InputDate @bind-Value="EndDate" class="form-control" />
+            <button class="btn btn-outline-primary" @onclick="ReloadAsync">Apply</button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card-soft stat-card">
+            <div class="text-muted">Total entries</div>
+            <div class="stat-value">@TotalEntries</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-soft stat-card">
+            <div class="text-muted">Current streak</div>
+            <div class="stat-value">@CurrentStreak days</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-soft stat-card">
+            <div class="text-muted">Longest streak</div>
+            <div class="stat-value">@LongestStreak days</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card-soft">
+            <h5>Mood distribution</h5>
+            @if (MoodCategories.Count == 0)
+            {
+                <div class="text-muted">No data yet.</div>
+            }
+            else
+            {
+                @foreach (var mood in MoodCategories)
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>@mood.Category</span>
+                        <span>@mood.Count</span>
+                    </div>
+                    <div class="progress-track mb-2">
+                        <div class="progress-bar" style="width: @GetPercent(mood.Count)%"></div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-soft">
+            <h5>Top tags</h5>
+            @if (TagUsage.Count == 0)
+            {
+                <div class="text-muted">No tags yet.</div>
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var tag in TagUsage.Take(8))
+                    {
+                        <span class="chip">@tag.Name · @tag.Count</span>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private DateTime StartDate { get; set; } = DateTime.Today.AddDays(-30);
+    private DateTime EndDate { get; set; } = DateTime.Today;
+    private int TotalEntries { get; set; }
+    private int CurrentStreak { get; set; }
+    private int LongestStreak { get; set; }
+    private IReadOnlyList<CategoryCount> MoodCategories { get; set; } = new List<CategoryCount>();
+    private IReadOnlyList<TagCount> TagUsage { get; set; } = new List<TagCount>();
+    private int MaxMoodCount => MoodCategories.Count == 0 ? 1 : MoodCategories.Max(m => m.Count);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        TotalEntries = await JournalService.GetTotalCountAsync();
+        CurrentStreak = await StreakService.GetCurrentStreakAsync();
+        LongestStreak = await StreakService.GetLongestStreakAsync();
+        MoodCategories = await AnalyticsService.GetMoodCategoryDistributionAsync(StartDate, EndDate);
+        TagUsage = await AnalyticsService.GetTagUsageAsync(StartDate, EndDate);
+    }
+
+    private int GetPercent(int count)
+    {
+        return (int)Math.Round(count / (double)MaxMoodCount * 100);
+    }
+}

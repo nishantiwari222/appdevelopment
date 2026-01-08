@@ -1,0 +1,74 @@
+@page "/streaks"
+@inject StreakService StreakService
+
+<div class="card-soft">
+    <h3>Streaks</h3>
+    <div class="text-muted">Track consistency and missed days.</div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card-soft">
+            <div class="text-muted">Current streak</div>
+            <div class="display-6">@CurrentStreak days</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card-soft">
+            <div class="text-muted">Longest streak</div>
+            <div class="display-6">@LongestStreak days</div>
+        </div>
+    </div>
+</div>
+
+<div class="card-soft">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label">Start date</label>
+            <InputDate class="form-control" @bind-Value="StartDate" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">End date</label>
+            <InputDate class="form-control" @bind-Value="EndDate" />
+        </div>
+        <div class="col-md-4">
+            <button class="btn btn-primary" @onclick="LoadMissedDays">Show missed days</button>
+        </div>
+    </div>
+
+    <div class="mt-3">
+        @if (MissedDays.Count == 0)
+        {
+            <div class="text-muted">No missed days in this range.</div>
+        }
+        else
+        {
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var day in MissedDays)
+                {
+                    <span class="badge-soft">@day.ToString("yyyy-MM-dd")</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private int CurrentStreak { get; set; }
+    private int LongestStreak { get; set; }
+    private DateTime StartDate { get; set; } = DateTime.Today.AddDays(-30);
+    private DateTime EndDate { get; set; } = DateTime.Today;
+    private IReadOnlyList<DateTime> MissedDays { get; set; } = new List<DateTime>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentStreak = await StreakService.GetCurrentStreakAsync();
+        LongestStreak = await StreakService.GetLongestStreakAsync();
+        await LoadMissedDays();
+    }
+
+    private async Task LoadMissedDays()
+    {
+        MissedDays = await StreakService.GetMissedDaysAsync(StartDate, EndDate);
+    }
+}

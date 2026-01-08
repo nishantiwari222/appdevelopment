@@ -1,0 +1,52 @@
+-- SQLite schema for YourOwnJournal
+CREATE TABLE IF NOT EXISTS JournalEntries (
+    EntryId INTEGER PRIMARY KEY AUTOINCREMENT,
+    EntryDate TEXT NOT NULL UNIQUE,
+    Title TEXT NOT NULL,
+    ContentMarkdown TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL,
+    UpdatedAt TEXT NOT NULL,
+    PrimaryMoodId INTEGER NOT NULL,
+    FOREIGN KEY (PrimaryMoodId) REFERENCES Moods(MoodId)
+);
+
+CREATE TABLE IF NOT EXISTS Moods (
+    MoodId INTEGER PRIMARY KEY,
+    Name TEXT NOT NULL,
+    Category TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS EntrySecondaryMoods (
+    EntryId INTEGER NOT NULL,
+    MoodId INTEGER NOT NULL,
+    PRIMARY KEY (EntryId, MoodId),
+    FOREIGN KEY (EntryId) REFERENCES JournalEntries(EntryId) ON DELETE CASCADE,
+    FOREIGN KEY (MoodId) REFERENCES Moods(MoodId) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Tags (
+    TagId INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name TEXT NOT NULL UNIQUE,
+    IsPrebuilt INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS EntryTags (
+    EntryId INTEGER NOT NULL,
+    TagId INTEGER NOT NULL,
+    PRIMARY KEY (EntryId, TagId),
+    FOREIGN KEY (EntryId) REFERENCES JournalEntries(EntryId) ON DELETE CASCADE,
+    FOREIGN KEY (TagId) REFERENCES Tags(TagId) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS AppSettings (
+    Key TEXT PRIMARY KEY,
+    Value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS AppLocks (
+    Key TEXT PRIMARY KEY,
+    Value TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS IX_JournalEntries_EntryDate ON JournalEntries(EntryDate);
+CREATE INDEX IF NOT EXISTS IX_JournalEntries_Title ON JournalEntries(Title);

@@ -1,0 +1,91 @@
+@page "/entries"
+@inject JournalService JournalService
+@inject SettingsService SettingsService
+
+<div class="card-soft">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h3>Entries</h3>
+            <div class="text-muted">Paginated timeline of your journal.</div>
+        </div>
+        <div class="badge-soft">Page @PageNumber of @TotalPages</div>
+    </div>
+</div>
+
+<div class="card-soft">
+    @if (EntryList.Count == 0)
+    {
+        <div class="text-muted">No entries yet.</div>
+    }
+    else
+    {
+        <table class="table-lite">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Title</th>
+                    <th>Mood</th>
+                    <th>Tags</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in EntryList)
+                {
+                    <tr>
+                        <td><a href="/entries/@entry.EntryDate.ToString("yyyy-MM-dd")">@entry.EntryDate.ToString("yyyy-MM-dd")</a></td>
+                        <td>@entry.Title</td>
+                        <td>@entry.PrimaryMood?.Name</td>
+                        <td>@string.Join(", ", entry.EntryTags.Select(et => et.Tag?.Name).Where(t => !string.IsNullOrWhiteSpace(t)))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+<div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary" @onclick="PreviousPage" disabled="@(PageNumber == 1)">Previous</button>
+    <button class="btn btn-outline-secondary" @onclick="NextPage" disabled="@(PageNumber >= TotalPages)">Next</button>
+</div>
+
+@code {
+    private int PageNumber { get; set; } = 1;
+    private int PageSize { get; set; } = 10;
+    private int TotalEntries { get; set; }
+    private int TotalPages => PageSize == 0 ? 1 : (int)Math.Ceiling(TotalEntries / (double)PageSize);
+    private IReadOnlyList<JournalEntry> EntryList { get; set; } = new List<JournalEntry>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageSize = await SettingsService.GetPageSizeAsync();
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        TotalEntries = await JournalService.GetTotalCountAsync();
+        EntryList = await JournalService.GetPagedAsync(PageNumber, PageSize);
+    }
+
+    private async Task PreviousPage()
+    {
+        if (PageNumber <= 1)
+        {
+            return;
+        }
+
+        PageNumber--;
+        await LoadPageAsync();
+    }
+
+    private async Task NextPage()
+    {
+        if (PageNumber >= TotalPages)
+        {
+            return;
+        }
+
+        PageNumber++;
+        await LoadPageAsync();
+    }
+}

@@ -1,0 +1,111 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject SettingsService SettingsService
+@inject AppInitializer AppInitializer
+@inject AppState AppState
+@inject NavigationManager NavigationManager
+
+<div class="app-shell @ThemeClass">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">YJ</div>
+            <div>
+                <div class="brand-title">YourOwnJournal</div>
+                <div class="brand-subtitle">Private daily reflections</div>
+            </div>
+        </div>
+        <NavMenu />
+    </aside>
+
+    <section class="content-area">
+        <header class="topbar">
+            <div>
+                <h1 class="page-title">@PageTitle</h1>
+                <div class="page-subtitle">Keep a daily streak and track your mood.</div>
+            </div>
+            <div class="topbar-actions">
+                <a class="btn btn-sm btn-outline-primary" href="/today">Today</a>
+                <a class="btn btn-sm btn-primary" href="/entries">Entries</a>
+            </div>
+        </header>
+
+        <main class="main-content">
+            @if (!AppState.IsInitialized)
+            {
+                <div class="card-soft">Starting up...</div>
+            }
+            else if (!string.IsNullOrWhiteSpace(AppState.StartupError))
+            {
+                <div class="card-soft text-danger">@AppState.StartupError</div>
+            }
+            else
+            {
+                @Body
+            }
+        </main>
+    </section>
+</div>
+
+@if (AppState.IsInitialized && string.IsNullOrWhiteSpace(AppState.StartupError) && AppState.IsLocked)
+{
+    <LockPanel OnUnlocked="HandleUnlock" />
+}
+
+@code {
+    private string ThemeClass => AppState.Theme == "dark" ? "theme-dark" : "theme-light";
+    private string PageTitle { get; set; } = "Dashboard";
+
+    protected override async Task OnInitializedAsync()
+    {
+        AppState.OnChange += StateHasChanged;
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        try
+        {
+            await AppInitializer.InitializeAsync();
+            var theme = await SettingsService.GetThemeAsync();
+            AppState.SetTheme(theme);
+            PageTitle = GetPageTitle(NavigationManager.Uri);
+        }
+        catch (Exception ex)
+        {
+            StartupLogger.Log($"MainLayout init error: {ex}");
+            AppState.SetStartupError($"Startup error: {ex.Message}");
+        }
+    }
+
+    private void HandleUnlock()
+    {
+        AppState.SetLocked(false);
+    }
+
+    public void Dispose()
+    {
+        AppState.OnChange -= StateHasChanged;
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        PageTitle = GetPageTitle(args.Location);
+        StateHasChanged();
+    }
+
+    private static string GetPageTitle(string uri)
+    {
+        var path = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+        return path switch
+        {
+            "" => "Dashboard",
+            "today" => "Today",
+            "calendar" => "Calendar",
+            "entries" => "Entries",
+            var p when p.StartsWith("entries/") => "Entry",
+            "search" => "Search & Filter",
+            "streaks" => "Streaks",
+            "export" => "Export",
+            "settings" => "Settings",
+            "lock" => "Lock",
+            _ => "YourOwnJournal"
+        };
+    }
+}

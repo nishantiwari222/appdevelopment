@@ -1,0 +1,209 @@
+@page "/entries/{DateString}"
+@inject JournalService JournalService
+@inject MoodService MoodService
+@inject TagService TagService
+@inject NavigationManager NavigationManager
+
+<div class="card-soft">
+    <h3>Entry for @EntryDate.ToString("yyyy-MM-dd")</h3>
+    <div class="text-muted">Create or edit the entry for this day.</div>
+</div>
+
+@if (IsLoading)
+{
+    <div class="card-soft">Loading...</div>
+}
+else
+{
+    <EditForm Model="EntryModel" OnValidSubmit="HandleSave">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="card-soft">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Title</label>
+                    <InputText class="form-control" @bind-Value="EntryModel.Title" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Primary mood</label>
+                    <InputSelect class="form-select" @bind-Value="EntryModel.PrimaryMoodId">
+                        <option value="">Select mood</option>
+                        @foreach (var mood in Moods)
+                        {
+                            <option value="@mood.MoodId">@mood.Name (@mood.Category)</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Secondary moods (up to 2)</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var mood in Moods)
+                        {
+                            <label class="badge-soft">
+                                <input type="checkbox"
+                                       checked="@EntryModel.SecondaryMoodIds.Contains(mood.MoodId)"
+                                       @onchange="(args) => ToggleSecondary(mood.MoodId, args.Value)" />
+                                @mood.Name
+                            </label>
+                        }
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Tags</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var tag in Tags)
+                        {
+                            <label class="badge-soft">
+                                <input type="checkbox"
+                                       checked="@EntryModel.Tags.Contains(tag.Name, StringComparer.OrdinalIgnoreCase)"
+                                       @onchange="(args) => ToggleTag(tag.Name, args.Value)" />
+                                @tag.Name
+                            </label>
+                        }
+                    </div>
+                    <div class="mt-2">
+                        <InputText class="form-control" @bind-Value="CustomTags" placeholder="Add custom tags separated by commas" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card-soft">
+                    <label class="form-label">Markdown entry</label>
+                    <InputTextArea class="form-control" @bind-Value="EntryModel.ContentMarkdown" rows="12" />
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="card-soft">
+                    <label class="form-label">Preview</label>
+                    <div class="markdown-preview">
+                        @((MarkupString)PreviewHtml)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Save entry</button>
+            @if (EntryModel.EntryId.HasValue)
+            {
+                <button class="btn btn-outline-danger" type="button" @onclick="HandleDelete">Delete</button>
+            }
+        </div>
+        <div class="text-muted">@Message</div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string DateString { get; set; } = string.Empty;
+
+    private DateTime EntryDate { get; set; } = DateTime.Today;
+    private JournalEntryEditModel EntryModel { get; set; } = new();
+    private IReadOnlyList<Mood> Moods { get; set; } = new List<Mood>();
+    private IReadOnlyList<Tag> Tags { get; set; } = new List<Tag>();
+    private bool IsLoading { get; set; } = true;
+    private string Message { get; set; } = string.Empty;
+    private string CustomTags { get; set; } = string.Empty;
+    private string PreviewHtml => Markdig.Markdown.ToHtml(EntryModel.ContentMarkdown ?? string.Empty);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DateTime.TryParse(DateString, out var parsed))
+        {
+            EntryDate = parsed.Date;
+        }
+
+        Moods = await MoodService.GetAllAsync();
+        Tags = await TagService.GetAllAsync();
+
+        var entry = await JournalService.GetByDateAsync(EntryDate);
+        if (entry != null)
+        {
+            EntryModel = new JournalEntryEditModel
+            {
+                EntryId = entry.EntryId,
+                EntryDate = entry.EntryDate,
+                Title = entry.Title,
+                ContentMarkdown = entry.ContentMarkdown,
+                PrimaryMoodId = entry.PrimaryMoodId,
+                SecondaryMoodIds = entry.SecondaryMoods.Select(sm => sm.MoodId).ToList(),
+                Tags = entry.EntryTags.Select(et => et.Tag?.Name ?? string.Empty).Where(t => !string.IsNullOrWhiteSpace(t)).ToList()
+            };
+        }
+        else
+        {
+            EntryModel = new JournalEntryEditModel { EntryDate = EntryDate };
+        }
+
+        IsLoading = false;
+    }
+
+    private void ToggleSecondary(int moodId, object? isChecked)
+    {
+        if (isChecked is bool selected && selected)
+        {
+            if (EntryModel.SecondaryMoodIds.Count < 2 && !EntryModel.SecondaryMoodIds.Contains(moodId))
+            {
+                EntryModel.SecondaryMoodIds.Add(moodId);
+            }
+        }
+        else
+        {
+            EntryModel.SecondaryMoodIds.Remove(moodId);
+        }
+    }
+
+    private void ToggleTag(string tagName, object? isChecked)
+    {
+        if (isChecked is bool selected && selected)
+        {
+            if (!EntryModel.Tags.Contains(tagName, StringComparer.OrdinalIgnoreCase))
+            {
+                EntryModel.Tags.Add(tagName);
+            }
+        }
+        else
+        {
+            EntryModel.Tags.RemoveAll(t => string.Equals(t, tagName, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        Message = string.Empty;
+        if (!string.IsNullOrWhiteSpace(CustomTags))
+        {
+            var custom = CustomTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (var tag in custom)
+            {
+                if (!EntryModel.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+                {
+                    EntryModel.Tags.Add(tag);
+                }
+            }
+            CustomTags = string.Empty;
+        }
+
+        var result = await JournalService.SaveEntryAsync(EntryModel);
+        Message = result.Message;
+
+        if (result.Success)
+        {
+            NavigationManager.NavigateTo("/entries");
+        }
+    }
+
+    private async Task HandleDelete()
+    {
+        if (!EntryModel.EntryId.HasValue)
+        {
+            return;
+        }
+
+        await JournalService.DeleteEntryAsync(EntryModel.EntryId.Value);
+        NavigationManager.NavigateTo("/entries");
+    }
+}

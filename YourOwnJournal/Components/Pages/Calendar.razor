@@ -1,0 +1,92 @@
+@page "/calendar"
+@inject JournalService JournalService
+@inject NavigationManager NavigationManager
+
+<div class="card-soft">
+    <div class="d-flex justify-content-between align-items-center">
+        <h3>@CurrentMonth.ToString("MMMM yyyy")</h3>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @onclick="PreviousMonth">Previous</button>
+            <button class="btn btn-outline-secondary" @onclick="NextMonth">Next</button>
+        </div>
+    </div>
+</div>
+
+<div class="card-soft">
+    <div class="calendar-grid">
+        @foreach (var dayName in DayNames)
+        {
+            <div class="text-muted text-center">@dayName</div>
+        }
+        @foreach (var day in CalendarDays)
+        {
+            if (day == null)
+            {
+                <div></div>
+            }
+            else
+            {
+                var hasEntry = EntryDates.Contains(day.Value);
+                <button class="calendar-day @(hasEntry ? "entry" : "")" @onclick="() => OpenDate(day.Value)">
+                    <div>@day.Value.Day</div>
+                </button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private DateTime CurrentMonth { get; set; } = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private IReadOnlyList<DateTime?> CalendarDays { get; set; } = new List<DateTime?>();
+    private HashSet<DateTime> EntryDates { get; set; } = new();
+    private string[] DayNames { get; } = new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMonthAsync();
+    }
+
+    private async Task LoadMonthAsync()
+    {
+        var monthStart = new DateTime(CurrentMonth.Year, CurrentMonth.Month, 1);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        var entries = await JournalService.GetByDateRangeAsync(monthStart, monthEnd);
+        EntryDates = entries.Select(e => e.EntryDate).ToHashSet();
+        CalendarDays = BuildCalendarDays(monthStart);
+    }
+
+    private IReadOnlyList<DateTime?> BuildCalendarDays(DateTime monthStart)
+    {
+        var days = new List<DateTime?>();
+        var firstDayOffset = (int)monthStart.DayOfWeek;
+        for (var i = 0; i < firstDayOffset; i++)
+        {
+            days.Add(null);
+        }
+
+        var daysInMonth = DateTime.DaysInMonth(monthStart.Year, monthStart.Month);
+        for (var day = 1; day <= daysInMonth; day++)
+        {
+            days.Add(new DateTime(monthStart.Year, monthStart.Month, day));
+        }
+
+        return days;
+    }
+
+    private async Task PreviousMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(-1);
+        await LoadMonthAsync();
+    }
+
+    private async Task NextMonth()
+    {
+        CurrentMonth = CurrentMonth.AddMonths(1);
+        await LoadMonthAsync();
+    }
+
+    private void OpenDate(DateTime date)
+    {
+        NavigationManager.NavigateTo($"/entries/{date:yyyy-MM-dd}");
+    }
+}

@@ -1,0 +1,83 @@
+@inject SecurityService SecurityService
+@inject AppState AppState
+
+<div class="lock-overlay">
+    <div class="lock-card">
+        <h2>@(IsPinSet ? "Unlock Journal" : "Set Your PIN")</h2>
+        <p>@(IsPinSet ? "Enter your PIN to unlock." : "Create a PIN to secure your journal.")</p>
+
+        <EditForm Model="PinModel" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div class="mb-3">
+                <label class="form-label">PIN</label>
+                <InputText @bind-Value="PinModel.Pin" type="password" class="form-control" />
+            </div>
+            @if (!IsPinSet)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Confirm PIN</label>
+                    <InputText @bind-Value="PinModel.PinConfirm" type="password" class="form-control" />
+                </div>
+            }
+            <div class="text-danger mb-2">@Message</div>
+            <button class="btn btn-primary w-100" type="submit">@(IsPinSet ? "Unlock" : "Save PIN")</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnUnlocked { get; set; }
+
+    private bool IsPinSet { get; set; }
+    private PinInputModel PinModel { get; set; } = new();
+    private string Message { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsPinSet = await SecurityService.IsPinSetAsync();
+    }
+
+    private async Task HandleSubmit()
+    {
+        Message = string.Empty;
+        if (!IsPinSet)
+        {
+            if (PinModel.Pin != PinModel.PinConfirm)
+            {
+                Message = "PIN entries do not match.";
+                return;
+            }
+
+            var set = await SecurityService.SetPinAsync(PinModel.Pin);
+            if (!set)
+            {
+                Message = "PIN must be at least 4 characters.";
+                return;
+            }
+
+            IsPinSet = true;
+            PinModel = new PinInputModel();
+        }
+        else
+        {
+            if (!await SecurityService.VerifyPinAsync(PinModel.Pin))
+            {
+                Message = "Incorrect PIN.";
+                return;
+            }
+        }
+
+        PinModel = new PinInputModel();
+        await OnUnlocked.InvokeAsync();
+        AppState.SetLocked(false);
+    }
+
+    private class PinInputModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MinLength(4)]
+        public string Pin { get; set; } = string.Empty;
+
+        public string PinConfirm { get; set; } = string.Empty;
+    }
+}
