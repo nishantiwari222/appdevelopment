@@ -6,3 +6,5 @@
 *.sln.docstates
 bin/
 obj/
+**/bin/
+**/obj/
