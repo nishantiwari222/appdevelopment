@@ -257,6 +257,12 @@ a {
   background: var(--bg-alt);
 }
 
+.rich-editor {
+  min-height: 280px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
 .lock-overlay {
   position: fixed;
   inset: 0;

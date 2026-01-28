@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using System.Net;
+using System.Text.RegularExpressions;
 using YourOwnJournal.Data;
 
 namespace YourOwnJournal.Services;
@@ -75,7 +77,14 @@ public class AnalyticsService
             return 0;
         }
 
-        var parts = content.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        var cleaned = content;
+        if (cleaned.Contains('<'))
+        {
+            cleaned = Regex.Replace(cleaned, "<[^>]+>", " ");
+            cleaned = WebUtility.HtmlDecode(cleaned);
+        }
+
+        var parts = cleaned.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
         return parts.Length;
     }
 }

@@ -1,4 +1,5 @@
 using QuestPDF.Fluent;
+using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.Net;
 using System.Text;
@@ -28,31 +29,34 @@ public class ExportService
         {
             container.Page(page =>
             {
-                page.Margin(30);
+                page.Size(new PageSize(210, 297, Unit.Millimetre));
+                page.Margin(10, Unit.Millimetre);
+                page.DefaultTextStyle(x => x.FontSize(12).LineHeight(1.4f));
                 page.Content().Column(column =>
                 {
-                    column.Item().Text("YourOwnJournal Export").FontSize(20).Bold();
-                    column.Item().Text($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm}").FontSize(10);
-                    column.Item().PaddingVertical(10).LineHorizontal(1);
+                    column.Spacing(6);
+                    column.Item().Text("YourOwnJournal Export").FontSize(22).Bold();
+                    column.Item().Text($"Exported: {DateTime.Now:yyyy-MM-dd HH:mm}").FontSize(11);
+                    column.Item().PaddingVertical(8).LineHorizontal(1);
 
                     foreach (var entry in entries.OrderBy(e => e.EntryDate))
                     {
-                        column.Item().Text($"{entry.EntryDate:yyyy-MM-dd} — {entry.Title}").FontSize(14).Bold();
-                        column.Item().Text($"Primary mood: {entry.PrimaryMood?.Name ?? "-"}").FontSize(10);
+                        column.Item().Text($"{entry.EntryDate:yyyy-MM-dd} — {entry.Title}").FontSize(15).Bold();
+                        column.Item().Text($"Primary mood: {entry.PrimaryMood?.Name ?? "-"}").FontSize(11);
                         if (entry.SecondaryMoods.Count > 0)
                         {
                             var secondary = string.Join(", ", entry.SecondaryMoods.Select(sm => sm.Mood?.Name).Where(name => !string.IsNullOrWhiteSpace(name)));
-                            column.Item().Text($"Secondary moods: {secondary}").FontSize(10);
+                            column.Item().Text($"Secondary moods: {secondary}").FontSize(11);
                         }
 
                         if (entry.EntryTags.Count > 0)
                         {
                             var tags = string.Join(", ", entry.EntryTags.Select(et => et.Tag?.Name).Where(name => !string.IsNullOrWhiteSpace(name)));
-                            column.Item().Text($"Tags: {tags}").FontSize(10);
+                            column.Item().Text($"Tags: {tags}").FontSize(11);
                         }
 
-                        column.Item().PaddingVertical(6).Text(entry.ContentMarkdown).FontSize(11);
-                        column.Item().PaddingBottom(10).LineHorizontal(1);
+                        column.Item().PaddingVertical(6).Text(entry.ContentMarkdown).FontSize(12);
+                        column.Item().PaddingBottom(8).LineHorizontal(1);
                     }
                 });
             });
@@ -67,8 +71,9 @@ public class ExportService
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         sb.AppendLine("<html><head><meta charset='utf-8'/>");
+        sb.AppendLine("<meta name='viewport' content='width=595, initial-scale=1'/>");
         sb.AppendLine("<style>");
-        sb.AppendLine("body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:32px;color:#1f1b16;} h1{font-size:20px;} h2{font-size:16px;margin-top:24px;} .meta{font-size:12px;color:#6f6459;} .tags{margin:6px 0;} .tag{display:inline-block;background:#f2e7dd;border-radius:999px;padding:4px 8px;margin-right:6px;font-size:11px;} .divider{border-top:1px solid #e3d7cc;margin:16px 0;} ");
+        sb.AppendLine("@page{size:210mm 297mm;margin:10mm;} html,body{width:100%;} body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;color:#1f1b16;font-size:12pt;line-height:1.5;} h1{font-size:18pt;} h2{font-size:14pt;margin-top:18pt;} .meta{font-size:10pt;color:#6f6459;} .tags{margin:6pt 0;} .tag{display:inline-block;background:#f2e7dd;border-radius:999px;padding:3pt 7pt;margin-right:6pt;font-size:9pt;} .divider{border-top:1px solid #e3d7cc;margin:12pt 0;} ");
         sb.AppendLine("</style></head><body>");
         sb.AppendLine("<h1>YourOwnJournal Export</h1>");
         sb.AppendLine($"<div class='meta'>Exported: {DateTime.Now:yyyy-MM-dd HH:mm}</div>");

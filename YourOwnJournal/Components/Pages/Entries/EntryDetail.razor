@@ -3,6 +3,7 @@
 @inject MoodService MoodService
 @inject TagService TagService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <div class="card-soft">
     <h3>Entry for @EntryDate.ToString("yyyy-MM-dd")</h3>
@@ -72,8 +73,16 @@ else
         <div class="row g-3">
             <div class="col-lg-6">
                 <div class="card-soft">
-                    <label class="form-label">Markdown entry</label>
-                    <InputTextArea class="form-control" @bind-Value="EntryModel.ContentMarkdown" rows="12" />
+                    <label class="form-label">Entry</label>
+                    <div class="btn-group mb-2" role="group" aria-label="Markdown formatting">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="ApplyBold"><strong>B</strong></button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="ApplyItalic"><em>I</em></button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="ApplyHeading">H</button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="ApplyList">List</button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="ApplyLink">Link</button>
+                    </div>
+                    <div id="entry-editor" class="form-control rich-editor" contenteditable="true"></div>
+                    <InputTextArea id="entry-markdown" class="d-none" @bind-Value="EntryModel.ContentMarkdown" />
                 </div>
             </div>
             <div class="col-lg-6">
@@ -107,7 +116,7 @@ else
     private bool IsLoading { get; set; } = true;
     private string Message { get; set; } = string.Empty;
     private string CustomTags { get; set; } = string.Empty;
-    private string PreviewHtml => Markdig.Markdown.ToHtml(EntryModel.ContentMarkdown ?? string.Empty);
+    private string PreviewHtml => EntryModel.ContentMarkdown ?? string.Empty;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -132,6 +141,7 @@ else
                 SecondaryMoodIds = entry.SecondaryMoods.Select(sm => sm.MoodId).ToList(),
                 Tags = entry.EntryTags.Select(et => et.Tag?.Name ?? string.Empty).Where(t => !string.IsNullOrWhiteSpace(t)).ToList()
             };
+            EntryModel.ContentMarkdown = NormalizeEditorHtml(EntryModel.ContentMarkdown);
         }
         else
         {
@@ -139,6 +149,14 @@ else
         }
 
         IsLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("richTextEditor.init", "entry-editor", "entry-markdown");
+        }
     }
 
     private void ToggleSecondary(int moodId, object? isChecked)
@@ -205,5 +223,27 @@ else
 
         await JournalService.DeleteEntryAsync(EntryModel.EntryId.Value);
         NavigationManager.NavigateTo("/entries");
+    }
+
+    private Task ApplyBold() => JS.InvokeVoidAsync("richTextEditor.exec", "entry-editor", "bold").AsTask();
+    private Task ApplyItalic() => JS.InvokeVoidAsync("richTextEditor.exec", "entry-editor", "italic").AsTask();
+    private Task ApplyHeading() => JS.InvokeVoidAsync("richTextEditor.heading", "entry-editor", 3).AsTask();
+    private Task ApplyList() => JS.InvokeVoidAsync("richTextEditor.list", "entry-editor").AsTask();
+    private Task ApplyLink() => JS.InvokeVoidAsync("richTextEditor.link", "entry-editor").AsTask();
+
+    private static string NormalizeEditorHtml(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.TrimStart();
+        if (trimmed.StartsWith("<"))
+        {
+            return value;
+        }
+
+        return Markdig.Markdown.ToHtml(value);
     }
 }

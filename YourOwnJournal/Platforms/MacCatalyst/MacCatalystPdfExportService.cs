@@ -1,5 +1,6 @@
 using Foundation;
 using Microsoft.Maui.ApplicationModel;
+using CoreGraphics;
 using WebKit;
 
 namespace YourOwnJournal.Services;
@@ -14,7 +15,8 @@ public class MacCatalystPdfExportService : IPdfExportService
         await MainThread.InvokeOnMainThreadAsync(() =>
         {
             var config = new WKWebViewConfiguration();
-            webView = new WKWebView(CoreGraphics.CGRect.Empty, config);
+            // Set a fixed A4-sized frame so the HTML lays out at the correct width.
+            webView = new WKWebView(new CGRect(0, 0, 595, 842), config);
             webView.NavigationDelegate = new PdfNavigationDelegate(loadTcs);
             var baseUrl = new NSUrl(FileSystem.AppDataDirectory, true);
             webView.LoadHtmlString(html, baseUrl);

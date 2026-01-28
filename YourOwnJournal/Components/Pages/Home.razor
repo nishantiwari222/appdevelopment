@@ -64,19 +64,70 @@
     </div>
     <div class="col-lg-6">
         <div class="card-soft">
-            <h5>Top tags</h5>
+            <h5>Frequent moods</h5>
+            @if (TopMoods.Count == 0)
+            {
+                <div class="text-muted">No mood data yet.</div>
+            }
+            else
+            {
+                @foreach (var mood in TopMoods.Take(6))
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>@mood.Name</span>
+                        <span>@mood.Count</span>
+                    </div>
+                    <div class="progress-track mb-2">
+                        <div class="progress-bar" style="width: @GetPercent(mood.Count, MaxTopMoodCount)%"></div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card-soft">
+            <h5>Tag breakdown</h5>
             @if (TagUsage.Count == 0)
             {
                 <div class="text-muted">No tags yet.</div>
             }
             else
             {
-                <div class="d-flex flex-wrap gap-2">
-                    @foreach (var tag in TagUsage.Take(8))
-                    {
-                        <span class="chip">@tag.Name · @tag.Count</span>
-                    }
-                </div>
+                @foreach (var tag in TagUsage.Take(8))
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>@tag.Name</span>
+                        <span>@tag.Count</span>
+                    </div>
+                    <div class="progress-track mb-2">
+                        <div class="progress-bar" style="width: @GetPercent(tag.Count, MaxTagCount)%"></div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card-soft">
+            <h5>Word count trend</h5>
+            @if (WordCountTrend.Count == 0)
+            {
+                <div class="text-muted">No entries in this range.</div>
+            }
+            else
+            {
+                @foreach (var point in WordCountTrend)
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>@point.Date.ToString("MMM dd")</span>
+                        <span>@point.WordCount words</span>
+                    </div>
+                    <div class="progress-track mb-2">
+                        <div class="progress-bar" style="width: @GetPercent(point.WordCount, MaxWordCount)%"></div>
+                    </div>
+                }
             }
         </div>
     </div>
@@ -89,8 +140,13 @@
     private int CurrentStreak { get; set; }
     private int LongestStreak { get; set; }
     private IReadOnlyList<CategoryCount> MoodCategories { get; set; } = new List<CategoryCount>();
+    private IReadOnlyList<MoodCount> TopMoods { get; set; } = new List<MoodCount>();
     private IReadOnlyList<TagCount> TagUsage { get; set; } = new List<TagCount>();
+    private IReadOnlyList<WordCountPoint> WordCountTrend { get; set; } = new List<WordCountPoint>();
     private int MaxMoodCount => MoodCategories.Count == 0 ? 1 : MoodCategories.Max(m => m.Count);
+    private int MaxTopMoodCount => TopMoods.Count == 0 ? 1 : TopMoods.Max(m => m.Count);
+    private int MaxTagCount => TagUsage.Count == 0 ? 1 : TagUsage.Max(t => t.Count);
+    private int MaxWordCount => WordCountTrend.Count == 0 ? 1 : WordCountTrend.Max(w => w.WordCount);
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,11 +159,18 @@
         CurrentStreak = await StreakService.GetCurrentStreakAsync();
         LongestStreak = await StreakService.GetLongestStreakAsync();
         MoodCategories = await AnalyticsService.GetMoodCategoryDistributionAsync(StartDate, EndDate);
+        TopMoods = await AnalyticsService.GetTopMoodsAsync(StartDate, EndDate);
         TagUsage = await AnalyticsService.GetTagUsageAsync(StartDate, EndDate);
+        WordCountTrend = await AnalyticsService.GetWordCountTrendAsync(StartDate, EndDate);
     }
 
     private int GetPercent(int count)
     {
         return (int)Math.Round(count / (double)MaxMoodCount * 100);
+    }
+
+    private int GetPercent(int count, int max)
+    {
+        return max <= 0 ? 0 : (int)Math.Round(count / (double)max * 100);
     }
 }
